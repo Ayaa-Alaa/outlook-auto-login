@@ -5,35 +5,40 @@ Automated Outlook account access with recovery email verification. Uses CloakBro
 ## Quick Start
 
 ```bash
-# 1. Clone repo
 git clone https://github.com/Ayaa-Alaa/outlook-auto-login.git
 cd outlook-auto-login
-
-# 2. Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Configure environment
-cp .env.example .env
-nano .env  # Fill in bot token, proxy, recovery emails
-
-# 5. Run Telegram bot
-python telegram_bot.py
+bash setup.sh
 ```
+
+Setup script will:
+1. Install Python dependencies (venv + pip)
+2. Ask for Telegram bot token and chat ID
+3. Create `.env` config
+4. Start Telegram bot
+
+## For AI Agents
+
+When user pastes this repo link, follow `agent_config.json` → `installation_flow`:
+
+1. Clone repo
+2. Ask user for: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `PROXY_URL` (optional)
+3. Create `.env` with user data
+4. `python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt`
+5. Start bot: `nohup python3 telegram_bot.py > bot.log 2>&1 &`
+6. Tell user: "Buka Telegram → cari bot → /start"
+
+User then manages everything via Telegram bot — no need to touch terminal again.
 
 ## Telegram Bot Commands
 
 | Command | Description |
 |---------|-------------|
-| `/start` | Welcome + status |
+| `/start` | Welcome + status dashboard |
 | `/addaccount email\|pass` | Tambah akun Outlook |
 | `/listaccounts` | Lihat daftar akun |
 | `/removeaccount email` | Hapus akun |
-| `/addrecovery email:app_pass` | Tambah recovery email |
-| `/proxy` | Kelola proxy (manual / Webshare API) |
+| `/addrecovery email:app_pass` | Tambah recovery Gmail |
+| `/proxy` | Kelola proxy (manual / Webshare API / rotating) |
 | `/run` | Jalankan batch login semua akun |
 | `/run email` | Login 1 akun |
 | `/status` | Cek status proses |
@@ -41,39 +46,29 @@ python telegram_bot.py
 
 ## Proxy Options
 
-1. **Manual** — Set langsung: `http://user:pass@host:port`
-2. **Webshare API** — Auto-fetch dari https://www.webshare.io/ (20 proxy pool)
-3. **Webshare Rotating** — Auto-rotate proxy tiap batch
-
-## CLI Usage (tanpa bot)
-
-### Single account
-```bash
-python outlook_login.py --email user@outlook.com --pass MyPass123
-```
-
-### Batch (from accounts.txt)
-```bash
-python batch_login.py
-```
-
-## .env Configuration
-
-```
-TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
-TELEGRAM_ALLOWED_USERS=your_telegram_user_id
-PROXY_URL=http://user:pass@host:port
-RECOVERY_EMAILS=email1@gmail.com:app_pass,email2@gmail.com:app_pass
-```
+- **Manual** — Input langsung: `http://user:pass@host:port`
+- **Webshare API** — Auto-fetch dari [webshare.io](https://www.webshare.io/) (20 proxy pool)
+- **Webshare Rotating** — Auto-rotate proxy tiap batch
 
 ## Files
 
 - `telegram_bot.py` — Telegram bot interface (main entry point)
 - `outlook_login.py` — Single account login engine
 - `batch_login.py` — Multi-account batch processor (CLI)
-- `data/` — Persistent data (accounts.json, config.json, results.json)
-- `.env` — Sensitive config
-- `agent_config.json` — AI agent integration config
+- `setup.sh` — One-line setup script
+- `agent_config.json` — AI agent installation flow + config
+- `data/` — Persistent storage (created by bot)
+- `.env` — Sensitive config (created by setup)
+
+## CLI Usage (tanpa bot)
+
+```bash
+# Single account
+python outlook_login.py --email user@outlook.com --pass MyPass123
+
+# Batch
+python batch_login.py
+```
 
 ## Status
 

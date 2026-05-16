@@ -1,18 +1,96 @@
 {
   "project": "outlook-auto-login",
-  "version": "1.0.0-beta",
-  "description": "Automated Outlook account access with recovery email verification using stealth Chromium",
+  "version": "2.0.0-beta",
+  "description": "Automated Outlook account access with recovery email verification via Telegram bot",
   "github": "https://github.com/Ayaa-Alaa/outlook-auto-login",
   "status": "beta",
-  
+
+  "installation_flow": {
+    "description": "When user pastes this repo link, follow these steps IN ORDER:",
+    "steps": [
+      {
+        "step": 1,
+        "action": "Clone repo",
+        "commands": [
+          "git clone https://github.com/Ayaa-Alaa/outlook-auto-login.git",
+          "cd outlook-auto-login"
+        ]
+      },
+      {
+        "step": 2,
+        "action": "Ask user for required data BEFORE running setup",
+        "required_data": [
+          {
+            "field": "TELEGRAM_BOT_TOKEN",
+            "ask": "🤖 Kirim bot token dari @BotFather (format: 123456:ABC-DEF...)",
+            "how_to_get": "Buka @BotFather di Telegram → /newbot → ikuti instruksi → copy token",
+            "required": true
+          },
+          {
+            "field": "TELEGRAM_CHAT_ID",
+            "ask": "💬 Kirim chat ID Telegram kamu",
+            "how_to_get": "Buka @userinfobot di Telegram → /start → copy ID angka",
+            "required": true
+          },
+          {
+            "field": "PROXY_URL",
+            "ask": "🌐 Kirim proxy URL (format: http://user:pass@host:port). Ketik 'skip' kalau mau set nanti via bot",
+            "how_to_get": "Dari Webshare.io atau provider proxy lain. Bisa juga set nanti via /proxy di bot",
+            "required": false,
+            "default": ""
+          }
+        ]
+      },
+      {
+        "step": 3,
+        "action": "Create .env with user data",
+        "commands": [
+          "cat > .env << 'EOF'",
+          "TELEGRAM_BOT_TOKEN={TELEGRAM_BOT_TOKEN}",
+          "TELEGRAM_ALLOWED_USERS={TELEGRAM_CHAT_ID}",
+          "PROXY_URL={PROXY_URL}",
+          "RECOVERY_EMAILS=",
+          "EOF"
+        ]
+      },
+      {
+        "step": 4,
+        "action": "Setup Python environment and install dependencies",
+        "commands": [
+          "python3 -m venv venv",
+          "source venv/bin/activate",
+          "pip install -r requirements.txt"
+        ],
+        "timeout": 180,
+        "note": "cloakbrowser[geoip] download ~206MB binary on first install"
+      },
+      {
+        "step": 5,
+        "action": "Start Telegram bot in background",
+        "commands": [
+          "cd /home/ubuntu/outlook-auto-login",
+          "source venv/bin/activate",
+          "nohup python3 telegram_bot.py > bot.log 2>&1 &"
+        ],
+        "verify": "sleep 3 && tail -5 bot.log | grep -q 'started' && echo 'Bot running' || echo 'Bot failed to start'"
+      },
+      {
+        "step": 6,
+        "action": "Tell user to go to Telegram bot",
+        "message": "✅ Bot sudah jalan! Buka Telegram → cari bot kamu → kirim /start\n\nDari sana, kelola semua lewat bot:\n• /addaccount — tambah akun Outlook\n• /addrecovery — tambah recovery email\n• /proxy — set proxy (manual/Webshare API)\n• /run — jalankan batch login\n• /report — lihat hasil"
+      }
+    ]
+  },
+
   "dependencies": {
     "core": {
       "cloakbrowser": {
         "version": ">=0.3.28",
+        "extra": "[geoip]",
         "pypi": "https://pypi.org/project/cloakbrowser/",
         "github": "https://github.com/CloakHQ/CloakBrowser",
-        "description": "Stealth Chromium that passes every bot detection test. 57 C++ source-level fingerprint patches. Drop-in Playwright replacement.",
-        "install": "pip install cloakbrowser",
+        "description": "Stealth Chromium — 57 C++ source-level patches. Drop-in Playwright replacement.",
+        "install": "pip install cloakbrowser[geoip]",
         "features": [
           "reCAPTCHA v3 score 0.9",
           "Cloudflare Turnstile bypass",
@@ -28,8 +106,17 @@
       },
       "python-dotenv": {
         "version": ">=1.0.0",
-        "pypi": "https://pypi.org/project/python-dotenv/",
         "install": "pip install python-dotenv"
+      },
+      "python-telegram-bot": {
+        "version": ">=20.0",
+        "install": "pip install python-telegram-bot",
+        "description": "Async Telegram Bot API wrapper"
+      },
+      "httpx": {
+        "version": ">=0.24.0",
+        "install": "pip install httpx",
+        "description": "Async HTTP client for Webshare API"
       }
     },
     "system": {
@@ -38,61 +125,46 @@
     }
   },
 
-  "tools_and_apis": {
-    "cloakbrowser": {
-      "type": "browser-automation",
-      "url": "https://github.com/CloakHQ/CloakBrowser",
-      "api": {
-        "launch": {
-          "description": "Launch stealth Chromium browser",
-          "params": {
-            "headless": "bool (default True)",
-            "proxy": "str (http://user:pass@host:port)",
-            "humanize": "bool (default False)",
-            "geoip": "bool (default False)",
-            "args": "list[str] (extra Chrome args)"
-          },
-          "returns": "Playwright Browser object"
-        },
-        "launch_persistent_context": {
-          "description": "Launch with persistent profile (cookies/localStorage survive restarts)",
-          "params": {
-            "user_data_dir": "str (profile path)"
-          }
-        }
-      },
-      "stealth_features": [
-        "navigator.webdriver = false",
-        "navigator.plugins.length = 5",
-        "window.chrome = object",
-        "No HeadlessChrome in UA",
-        "CDP detection bypass",
-        "TLS fingerprint = Chrome",
-        "Canvas/WebGL/Audio noise",
-        "WebRTC IP spoofing"
-      ],
-      "detection_test_results": {
-        "bot.sannysoft.com": "56/56 ALL GREEN",
-        "bot.incolumitas.com": "35/36 passed",
-        "browserscan.net": "Normal 19/19",
-        "deviceandbrowserinfo.com": "isBot: false",
-        "recaptcha_v3_score": "0.9 (human level)"
+  "telegram_bot": {
+    "description": "Telegram bot interface for managing accounts, proxy, and running batch login",
+    "entry_point": "telegram_bot.py",
+    "commands": {
+      "/start": "Welcome + status dashboard",
+      "/addaccount email|pass": "Tambah akun Outlook",
+      "/listaccounts": "Lihat daftar akun",
+      "/removeaccount email": "Hapus akun",
+      "/addrecovery email:app_pass": "Tambah recovery Gmail + IMAP app password",
+      "/proxy": "Kelola proxy (manual / Webshare API / rotating)",
+      "/run": "Batch login semua akun",
+      "/run email": "Login 1 akun saja",
+      "/status": "Cek status proses running",
+      "/report": "Lihat hasil terakhir"
+    },
+    "proxy_modes": {
+      "manual": "User input langsung http://user:pass@host:port",
+      "webshare_api": "Auto-fetch dari Webshare.io API (20 proxy pool)",
+      "webshare_rotate": "Rotate proxy otomatis tiap batch"
+    }
+  },
+
+  "webshare_api": {
+    "description": "Webshare.io proxy provider API",
+    "base_url": "https://proxy.webshare.io/api/v2",
+    "endpoints": {
+      "list_proxies": "GET /proxy/list/?mode=direct",
+      "auth": "Header: Authorization Token <api_key>",
+      "response_fields": {
+        "proxy_address": "IP address",
+        "port": "Port number",
+        "username": "Auth username",
+        "password": "Auth password",
+        "valid": "Boolean — proxy is active",
+        "country_code": "Country (e.g. JP)",
+        "city_name": "City (e.g. Tokyo)"
       }
     },
-    "microsoft_graph_api": {
-      "type": "api",
-      "description": "Microsoft Graph API for email access (OAuth2 required)",
-      "library": "O365/python-o365",
-      "github": "https://github.com/O365/python-o365",
-      "note": "Basic auth disabled since 2024. Requires OAuth2 or App Password."
-    },
-    "gmail_imap": {
-      "type": "email-access",
-      "description": "Gmail IMAP for reading verification codes",
-      "server": "imap.gmail.com:993",
-      "auth": "App Password (not regular password)",
-      "setup_url": "https://myaccount.google.com/apppasswords"
-    }
+    "setup_url": "https://www.webshare.io/",
+    "api_key_location": "Dashboard → API → API Key"
   },
 
   "outlook_login_flow": {
@@ -138,22 +210,22 @@
       }
     ],
     "key_discoveries": {
-      "use_password_click": "Regular click() fails on span.fui-Link. Must use dispatchEvent with MouseEvent (mousedown/mouseup/click) on the leaf node element.",
-      "passkey_bypass": "Passkey setup page has no skip button. Navigate directly to Outlook URL — cookies are already set from password acceptance.",
-      "send_code_required": "Must click 'Send code' button before code is sent. Code is NOT sent automatically when entering recovery email.",
+      "use_password_click": "Regular click() fails on span.fui-Link. Must use dispatchEvent with MouseEvent on leaf node element.",
+      "passkey_bypass": "No skip button. Navigate directly to Outlook URL — cookies already set.",
+      "send_code_required": "Must click 'Send code' — code NOT sent automatically.",
       "recovery_matching": "Masked email like 'na*****@gmail.com' can match multiple candidates. Try each one.",
-      "code_timeout": "If code not received after 2 min, fall back to 'Use your password' — likely rate limited."
+      "code_timeout": "If code not received after 2 min, fall back to 'Use your password'."
     }
   },
 
   "known_issues": {
-    "imap_code_timeout": "Microsoft sometimes doesn't send codes to recovery emails. Rate limiting suspected. Fallback: 'Use your password' works reliably.",
+    "imap_code_timeout": "Microsoft sometimes doesn't send codes. Rate limiting suspected. Fallback: 'Use your password' works.",
     "passkey_setup": "No skip button visible. Workaround: navigate directly to Outlook URL.",
-    "login_slow": "~3 min per account due to 2-min IMAP polling timeout. Optimization: reduce timeout or skip IMAP entirely and always use password fallback."
+    "login_slow": "~3 min per account due to 2-min IMAP polling. Optimization: reduce timeout or skip IMAP entirely."
   },
 
   "optimization_ideas": [
-    "Skip IMAP polling entirely — always use 'Use your password' fallback (saves 2 min per account)",
+    "Skip IMAP polling — always use 'Use your password' fallback (saves 2 min per account)",
     "Parallel account processing with multiple browser instances",
     "Session persistence via launch_persistent_context() to skip verification on repeat logins",
     "Proxy rotation for batch processing to avoid rate limits"
