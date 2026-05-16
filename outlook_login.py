@@ -254,7 +254,14 @@ class OutlookLogin:
                     return False
 
             log.info("[4] Navigating to Outlook...")
-            self.page.goto('https://outlook.live.com/mail/0/inbox', timeout=30000)
+            try:
+                self.page.goto('https://outlook.live.com/mail/0/inbox', timeout=30000, wait_until='domcontentloaded')
+            except Exception as nav_err:
+                log.warning(f"  Initial goto failed ({type(nav_err).__name__}), retrying with commit...")
+                try:
+                    self.page.goto('https://outlook.live.com/mail/0/inbox', timeout=30000, wait_until='commit')
+                except Exception as nav_err2:
+                    log.warning(f"  Retry also failed: {nav_err2}. Checking current URL anyway...")
             time.sleep(15)
 
             url = self.page.url
