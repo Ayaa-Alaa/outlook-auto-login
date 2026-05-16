@@ -11,15 +11,30 @@ Automated Outlook account access with recovery email verification. Uses CloakBro
    - If no code after 2 min → click "Use your password" (via dispatchEvent)
 3. Bypass passkey setup by navigating directly to Outlook inbox
 
-## Setup
+## Quick Start
 
 ```bash
-# Install dependencies
-pip install cloakbrowser python-dotenv
+# 1. Clone repo
+git clone https://github.com/Ayaa-Alaa/outlook-auto-login.git
+cd outlook-auto-login
 
-# Copy .env and fill in your values
+# 2. Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# 3. Install dependencies (includes geoip for proxy timezone detection)
+pip install -r requirements.txt
+
+# 4. Configure environment
 cp .env.example .env
-nano .env
+nano .env  # Fill in your proxy and recovery email credentials
+
+# 5. Add accounts
+cp accounts.txt.example accounts.txt
+nano accounts.txt  # Format: email|password per line
+
+# 6. Run
+python batch_login.py
 ```
 
 ## Usage
@@ -35,6 +50,16 @@ python outlook_login.py --email user@outlook.com --pass MyPass123
 python batch_login.py
 ```
 
+## .env Configuration
+
+```
+PROXY_URL=http://user:pass@host:port
+RECOVERY_EMAILS=email1@gmail.com:app_password,email2@gmail.com:app_password
+```
+
+- **PROXY_URL**: HTTP/SOCKS5 proxy for CloakBrowser (helps bypass geo-restrictions)
+- **RECOVERY_EMAILS**: Gmail accounts used as recovery emails for Outlook. Need App Passwords for IMAP access. Generate at https://myaccount.google.com/apppasswords
+
 ## Files
 
 - `outlook_login.py` — Single account login
@@ -42,7 +67,13 @@ python batch_login.py
 - `.env` — Sensitive config (recovery emails, proxy, IMAP passwords)
 - `.env.example` — Template for `.env`
 - `accounts.txt` — Account list for batch mode
-- `screenshots/` — Debug screenshots
+- `agent_config.json` — AI agent integration config (tools, APIs, flow)
+- `screenshots/` — Debug screenshots (auto-created)
+
+## Dependencies
+
+- `cloakbrowser[geoip]` — Stealth Chromium with proxy geo-detection
+- `python-dotenv` — Load .env files
 
 ## Status
 

@@ -1,2 +1,2 @@
-cloakbrowser>=0.3.28
+cloakbrowser[geoip]>=0.3.28
 python-dotenv>=1.0.0
