@@ -819,16 +819,15 @@ async def _run_batch(update: Update, context: ContextTypes.DEFAULT_TYPE, account
     results = []
     start_time = time.time()
 
-    # Update .env
+    # Write .env from bot config (outlook_login.py reads from .env)
     env_file = SCRIPT_DIR / ".env"
-    lines = []
-    if env_file.exists():
-        for line in env_file.read_text().splitlines():
-            if not line.startswith("PROXY_URL=") and not line.startswith("RECOVERY_EMAILS="):
-                lines.append(line)
-    lines.append(f"PROXY_URL={cfg['proxy_url']}")
-    lines.append(f"RECOVERY_EMAILS=" + ",".join(f"{e}:{p}" for e, p in cfg.get("recovery_emails", {}).items()))
-    env_file.write_text("\n".join(lines) + "\n")
+    recovery_str = ",".join(f"{e}:{p}" for e, p in cfg.get("recovery_emails", {}).items())
+    env_lines = [
+        f"PROXY_URL={cfg.get('proxy_url', '')}",
+        f"RECOVERY_EMAILS={recovery_str}",
+    ]
+    env_file.write_text("\n".join(env_lines) + "\n")
+    log.info(f".env written: proxy={'set' if cfg.get('proxy_url') else 'NONE'}, recovery={len(cfg.get('recovery_emails', {}))} emails")
 
     is_running = True
     last_results = []
