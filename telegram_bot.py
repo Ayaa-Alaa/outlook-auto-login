@@ -149,7 +149,10 @@ def kb_accounts() -> InlineKeyboardMarkup:
             InlineKeyboardButton("🗑️", callback_data=f"account_del|{email}"),
         ])
 
-    keyboard.append([InlineKeyboardButton("➕ Tambah Akun", callback_data="account_add")])
+    keyboard.append([
+        InlineKeyboardButton("➕ Tambah Satu", callback_data="account_add"),
+        InlineKeyboardButton("📄 Upload File", callback_data="account_batch"),
+    ])
     keyboard.append([InlineKeyboardButton("🔙 Menu Utama", callback_data="main_menu")])
     return InlineKeyboardMarkup(keyboard)
 
@@ -367,6 +370,20 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         context.user_data["waiting_for"] = "add_account"
 
+    elif data == "account_batch":
+        await query.answer()
+        await query.edit_message_text(
+            "📄 *Upload Batch Akun*\n\n"
+            "Kirim file `.txt` dengan format:\n"
+            "```\nemail1@outlook.com|password1\nemail2@outlook.com|password2\n```\n\n"
+            "Atau langsung paste list di chat:\n"
+            "```\nemail1@outlook.com|pass1\nemail2@outlook.com|pass2\n```\n\n"
+            "⚠️ Akun yang sudah ada akan di-skip.\n\n"
+            "Ketik /cancel untuk batal.",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        context.user_data["waiting_for"] = "add_batch"
+
     elif data.startswith("account_del|"):
         email = data.split("|", 1)[1]
         accounts = get_accounts()
@@ -524,6 +541,78 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+# ─── Batch account processor ─────────────────────────────────────────
+async def _process_batch_text(text: str) -> str:
+    """Process pasted or uploaded batch account list."""
+    accounts = get_accounts()
+    existing = {a["email"] for a in accounts}
+
+    added = 0
+    skipped = 0
+    errors = []
+
+    for line in text.strip().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split("|", 1)
+        if len(parts) != 2:
+            errors.append(line)
+            continue
+        email, password = parts[0].strip(), parts[1].strip()
+        if not email or not password:
+            errors.append(line)
+            continue
+        if email in existing:
+            skipped += 1
+            continue
+        accounts.append({"email": email, "password": password, "added": datetime.now().isoformat()})
+        existing.add(email)
+        added += 1
+
+    save_accounts(accounts)
+
+    result = f"📄 *Batch Upload Result*\n\n"
+    result += f"✅ Ditambah: *{added}*\n"
+    if skipped:
+        result += f"⏭️ Skip (sudah ada): *{skipped}*\n"
+    if errors:
+        result += f"❌ Error format: *{len(errors)}*\n"
+        for e in errors[:5]:
+            result += f"   `{e[:40]}`\n"
+        if len(errors) > 5:
+            result += f"   ... +{len(errors)-5} lagi\n"
+    result += f"\n📧 Total akun: *{len(accounts)}*"
+    return result
+
+
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle uploaded .txt files for batch account import."""
+    if not await check_auth(update):
+        return
+
+    waiting = context.user_data.get("waiting_for")
+    if waiting != "add_batch":
+        await update.message.reply_text(
+            "📄 Untuk upload file, klik 📄 Upload File di menu Akun dulu.",
+            reply_markup=kb_main()
+        )
+        return
+
+    doc = update.message.document
+    if not doc.file_name.endswith(".txt"):
+        await update.message.reply_text("❌ File harus .txt")
+        return
+
+    file = await doc.get_file()
+    content = await file.download_as_bytearray()
+    text = content.decode("utf-8", errors="ignore")
+
+    result = await _process_batch_text(text)
+    context.user_data.pop("waiting_for", None)
+    await update.message.reply_text(result, parse_mode=ParseMode.MARKDOWN, reply_markup=kb_main())
+
+
 # ─── Text input handler ───────────────────────────────────────────────
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_auth(update):
@@ -560,6 +649,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=kb_main()
         )
+
+    # ─── Add batch (paste) ───
+    elif waiting == "add_batch":
+        result = await _process_batch_text(text)
+        context.user_data.pop("waiting_for", None)
+        await update.message.reply_text(result, parse_mode=ParseMode.MARKDOWN, reply_markup=kb_main())
 
     # ─── Add recovery ───
     elif waiting == "add_recovery":
@@ -825,6 +920,7 @@ def main():
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("cancel", cmd_cancel))
     app.add_handler(CallbackQueryHandler(callback_handler))
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     log.info("🤖 Telegram bot v2 started (menu-driven)!")
