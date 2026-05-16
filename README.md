@@ -1,78 +1,74 @@
 # Outlook Auto Login
 
-Automated Outlook account access with recovery email verification. Uses CloakBrowser (stealth Chromium) to bypass bot detection. Control everything via Telegram bot.
+Automated Outlook account login with recovery email verification. Uses CloakBrowser (stealth Chromium) to bypass bot detection.
 
 ## Quick Start
 
 ```bash
 git clone https://github.com/Ayaa-Alaa/outlook-auto-login.git
 cd outlook-auto-login
-bash setup.sh
-```
-
-Setup script will:
-1. Install Python dependencies (venv + pip)
-2. Ask for Telegram bot token and chat ID
-3. Create `.env` config
-4. Start Telegram bot
-
-## For AI Agents
-
-When user pastes this repo link, follow `agent_config.json` → `installation_flow`:
-
-1. Clone repo
-2. Ask user for: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `PROXY_URL` (optional)
-3. Create `.env` with user data
-4. `python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt`
-5. Start bot: `nohup python3 telegram_bot.py > bot.log 2>&1 &`
-6. Tell user: "Buka Telegram → cari bot → /start"
-
-User then manages everything via Telegram bot — no need to touch terminal again.
-
-## Telegram Bot Commands
-
-| Command | Description |
-|---------|-------------|
-| `/start` | Welcome + status dashboard |
-| `/addaccount email\|pass` | Tambah akun Outlook |
-| `/listaccounts` | Lihat daftar akun |
-| `/removeaccount email` | Hapus akun |
-| `/addrecovery email:app_pass` | Tambah recovery Gmail |
-| `/proxy` | Kelola proxy (manual / Webshare API / rotating) |
-| `/run` | Jalankan batch login semua akun |
-| `/run email` | Login 1 akun |
-| `/status` | Cek status proses |
-| `/report` | Hasil terakhir |
-
-## Proxy Options
-
-- **Manual** — Input langsung: `http://user:pass@host:port`
-- **Webshare API** — Auto-fetch dari [webshare.io](https://www.webshare.io/) (20 proxy pool)
-- **Webshare Rotating** — Auto-rotate proxy tiap batch
-
-## Files
-
-- `telegram_bot.py` — Telegram bot interface (main entry point)
-- `outlook_login.py` — Single account login engine
-- `batch_login.py` — Multi-account batch processor (CLI)
-- `setup.sh` — One-line setup script
-- `agent_config.json` — AI agent installation flow + config
-- `data/` — Persistent storage (created by bot)
-- `.env` — Sensitive config (created by setup)
-
-## CLI Usage (tanpa bot)
-
-```bash
-# Single account
-python outlook_login.py --email user@outlook.com --pass MyPass123
-
-# Batch
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp config.json.example config.json
+# Edit config.json — add recovery emails and proxy
+cp accounts.txt.example accounts.txt
+# Edit accounts.txt — add Outlook accounts
 python batch_login.py
 ```
 
+## For AI Agents
+
+Paste this repo link to your agent. Agent reads `agent_config.json` and follows the installation flow:
+
+1. Clone & install deps
+2. Ask user for: recovery emails, proxy (optional), accounts
+3. Create `config.json` and `accounts.txt`
+4. Test single account → run batch → report results
+
+## CLI Usage
+
+### Single account
+```bash
+python outlook_login.py --email user@outlook.com --pass MyPass123
+```
+
+### Single with custom config
+```bash
+python outlook_login.py --config config.json --email user@outlook.com --pass MyPass123
+```
+
+### Batch (from accounts.txt or accounts.json)
+```bash
+python batch_login.py
+python batch_login.py --accounts my_accounts.txt
+python batch_login.py --proxy http://user:pass@host:port
+```
+
+## Config
+
+`config.json`:
+```json
+{
+  "proxy_url": "http://user:pass@host:port",
+  "recovery_emails": {
+    "recovery1@gmail.com": "app_password",
+    "recovery2@gmail.com": "app_password"
+  }
+}
+```
+
+## Files
+
+- `outlook_login.py` — Single account login engine
+- `batch_login.py` — Multi-account batch processor
+- `config.json` — Runtime config (create from `config.json.example`)
+- `accounts.txt` — Account list (create from `accounts.txt.example`)
+- `results.json` — Auto-generated after batch run
+- `agent_config.json` — Agent installation flow & reference
+
 ## Status
 
-Beta — tested with 9 accounts, 100% success rate (~3 min per account).
+Tested with 9 accounts, 100% success rate (~3 min per account).
 
 ## License
 

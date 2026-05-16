@@ -1,4 +1,3 @@
-# Outlook accounts for batch login
-# Format: email|password
-
-# user@outlook.com|YourPassword123
+# Outlook accounts — one per line, format: email|password
+user1@outlook.com|Password123
+user2@outlook.com|Password456

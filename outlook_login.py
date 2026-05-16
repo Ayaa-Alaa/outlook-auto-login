@@ -1,21 +1,23 @@
 """
-Outlook Auto Login v3 - Automated Outlook account access with recovery email verification.
+Outlook Auto Login — Automated Outlook account access with recovery email verification.
 
 Flow:
 1. Enter email → recovery page (if needed)
-2. Match recovery email from .env list
+2. Match recovery email from config.json
 3. Click "Send code" → wait for code via IMAP
 4. If no code after 2 min → click "Use your password"
 5. Navigate to Outlook (bypass passkey)
 
 Usage:
     python outlook_login.py --email user@outlook.com --pass MyPass123
+    python outlook_login.py --config config.json --email user@outlook.com --pass MyPass123
 """
 
 import imaplib
 import email
 import re
 import sys
+import json
 import time
 import argparse
 import logging
@@ -23,16 +25,7 @@ import datetime
 from pathlib import Path
 from typing import Optional
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
-
-import os
-
 SCRIPT_DIR = Path(__file__).parent
-PROXY = os.getenv("PROXY_URL", "http://sabtu2026:sabtu2026@82.22.93.232:7939")
 SCREENSHOT_DIR = SCRIPT_DIR / "screenshots"
 SCREENSHOT_DIR.mkdir(exist_ok=True)
 
@@ -40,17 +33,35 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger("outlook_auto")
 
 
+# ─── Config ───────────────────────────────────────────────────────────
+def load_config(config_path: Path = None) -> dict:
+    """Load config from config.json."""
+    if config_path is None:
+        config_path = SCRIPT_DIR / "config.json"
+    if config_path.exists():
+        return json.loads(config_path.read_text())
+    return {}
+
+
+def get_proxy(config: dict) -> str:
+    """Get proxy URL from config."""
+    return config.get("proxy_url", "")
+
+
+def get_recovery_emails(config: dict) -> dict:
+    """Get recovery emails dict from config. {email: app_password}"""
+    return config.get("recovery_emails", {})
+
+
+# ─── Recovery email matching ─────────────────────────────────────────
 class RecoveryEmailManager:
-    def __init__(self):
-        self.emails: dict[str, str] = {}
-        raw = os.getenv("RECOVERY_EMAILS", "")
-        for entry in raw.split(","):
-            entry = entry.strip()
-            if not entry:
-                continue
-            parts = entry.split(":", 1)
-            if len(parts) == 2:
-                self.emails[parts[0].strip().lower()] = parts[1].strip()
+    def __init__(self, emails: dict[str, str] = None, config: dict = None):
+        if emails:
+            self.emails = emails
+        elif config:
+            self.emails = get_recovery_emails(config)
+        else:
+            self.emails = {}
         log.info(f"Loaded {len(self.emails)} recovery emails")
 
     def match_masked(self, masked: str) -> list[str]:
@@ -64,6 +75,7 @@ class RecoveryEmailManager:
         )
 
 
+# ─── IMAP code polling ───────────────────────────────────────────────
 def wait_for_code(gmail_addr: str, app_password: str, after_time: float, max_wait: int = 120) -> Optional[str]:
     """Wait for NEW Microsoft verification code via IMAP."""
     log.info(f"  Polling {gmail_addr} for new code (max {max_wait}s)...")
@@ -121,14 +133,15 @@ def wait_for_code(gmail_addr: str, app_password: str, after_time: float, max_wai
     return None
 
 
+# ─── Login engine ─────────────────────────────────────────────────────
 class OutlookLogin:
     def __init__(self, email_addr: str, password: str, recovery_mgr: RecoveryEmailManager,
-                 headless: bool = True, proxy: str = None):
+                 headless: bool = True, proxy: str = ""):
         self.email = email_addr
         self.password = password
         self.recovery_mgr = recovery_mgr
         self.headless = headless
-        self.proxy = proxy or PROXY
+        self.proxy = proxy
         self.page = None
         self.browser = None
 
@@ -203,7 +216,11 @@ class OutlookLogin:
 
         log.info(f"Starting login for {self.email}")
         try:
-            self.browser = launch(headless=self.headless, humanize=False, proxy=self.proxy, geoip=True)
+            launch_kwargs = dict(headless=self.headless, humanize=False, geoip=True)
+            if self.proxy:
+                launch_kwargs["proxy"] = self.proxy
+
+            self.browser = launch(**launch_kwargs)
             self.page = self.browser.new_page()
 
             log.info("[1] Opening login...")
@@ -360,20 +377,24 @@ class OutlookLogin:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Outlook Auto Login v3')
+    parser = argparse.ArgumentParser(description='Outlook Auto Login')
     parser.add_argument('--email', required=True, help='Outlook email')
     parser.add_argument('--pass', dest='password', required=True, help='Outlook password')
+    parser.add_argument('--config', default=str(SCRIPT_DIR / "config.json"), help='Config file path')
     parser.add_argument('--headless', action='store_true', default=True)
     parser.add_argument('--headed', action='store_true')
-    parser.add_argument('--proxy', default=PROXY)
+    parser.add_argument('--proxy', default=None, help='Override proxy URL')
 
     args = parser.parse_args()
 
-    recovery_mgr = RecoveryEmailManager()
+    config = load_config(Path(args.config))
+    proxy = args.proxy or get_proxy(config)
+    recovery_mgr = RecoveryEmailManager(config=config)
+
     outlook = OutlookLogin(
         email_addr=args.email, password=args.password,
         recovery_mgr=recovery_mgr,
-        headless=not args.headed, proxy=args.proxy
+        headless=not args.headed, proxy=proxy
     )
     success = outlook.run()
     sys.exit(0 if success else 1)

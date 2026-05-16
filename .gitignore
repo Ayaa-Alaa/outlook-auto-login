@@ -1,20 +1,15 @@
-# Environment
+# Sensitive data
+config.json
+accounts.txt
+accounts.json
 .env
-*.pyc
-__pycache__/
 
-# Screenshots (debug only)
+# Screenshots
 screenshots/
 
-# Accounts file (sensitive)
-accounts.txt
-accounts2.txt
-email_pemulihan.txt
-
-# Data directory (bot persistent storage - contains sensitive info)
-data/
-
-# Venv
+# Python
+*.pyc
+__pycache__/
 venv/
 
 # IDE
