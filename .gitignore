@@ -1,0 +1,20 @@
+# Environment
+.env
+*.pyc
+__pycache__/
+
+# Screenshots (debug only)
+screenshots/
+
+# Accounts file (sensitive)
+accounts.txt
+accounts2.txt
+email_pemulihan.txt
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
