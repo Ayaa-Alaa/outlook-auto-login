@@ -11,6 +11,12 @@ accounts.txt
 accounts2.txt
 email_pemulihan.txt
 
+# Data directory (bot persistent storage - contains sensitive info)
+data/
+
+# Venv
+venv/
+
 # IDE
 .vscode/
 .idea/

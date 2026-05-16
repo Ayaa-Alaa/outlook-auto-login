@@ -1,2 +1,4 @@
 cloakbrowser[geoip]>=0.3.28
 python-dotenv>=1.0.0
+python-telegram-bot>=20.0
+httpx>=0.24.0
