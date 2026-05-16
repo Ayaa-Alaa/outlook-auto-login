@@ -1,0 +1,161 @@
+{
+  "project": "outlook-auto-login",
+  "version": "1.0.0-beta",
+  "description": "Automated Outlook account access with recovery email verification using stealth Chromium",
+  "github": "https://github.com/Ayaa-Alaa/outlook-auto-login",
+  "status": "beta",
+  
+  "dependencies": {
+    "core": {
+      "cloakbrowser": {
+        "version": ">=0.3.28",
+        "pypi": "https://pypi.org/project/cloakbrowser/",
+        "github": "https://github.com/CloakHQ/CloakBrowser",
+        "description": "Stealth Chromium that passes every bot detection test. 57 C++ source-level fingerprint patches. Drop-in Playwright replacement.",
+        "install": "pip install cloakbrowser",
+        "features": [
+          "reCAPTCHA v3 score 0.9",
+          "Cloudflare Turnstile bypass",
+          "FingerprintJS detection pass",
+          "Human-like mouse/keyboard/scroll (humanize=True)",
+          "Proxy support (HTTP/SOCKS5)",
+          "GeoIP auto timezone/locale",
+          "Persistent profiles",
+          "Auto-updating binary"
+        ],
+        "binary_size_mb": 206,
+        "chromium_version": "146.0.7680.177.3"
+      },
+      "python-dotenv": {
+        "version": ">=1.0.0",
+        "pypi": "https://pypi.org/project/python-dotenv/",
+        "install": "pip install python-dotenv"
+      }
+    },
+    "system": {
+      "python": ">=3.9",
+      "platform": "linux-x64 (tested), linux-arm64, darwin-arm64, darwin-x64, windows-x64"
+    }
+  },
+
+  "tools_and_apis": {
+    "cloakbrowser": {
+      "type": "browser-automation",
+      "url": "https://github.com/CloakHQ/CloakBrowser",
+      "api": {
+        "launch": {
+          "description": "Launch stealth Chromium browser",
+          "params": {
+            "headless": "bool (default True)",
+            "proxy": "str (http://user:pass@host:port)",
+            "humanize": "bool (default False)",
+            "geoip": "bool (default False)",
+            "args": "list[str] (extra Chrome args)"
+          },
+          "returns": "Playwright Browser object"
+        },
+        "launch_persistent_context": {
+          "description": "Launch with persistent profile (cookies/localStorage survive restarts)",
+          "params": {
+            "user_data_dir": "str (profile path)"
+          }
+        }
+      },
+      "stealth_features": [
+        "navigator.webdriver = false",
+        "navigator.plugins.length = 5",
+        "window.chrome = object",
+        "No HeadlessChrome in UA",
+        "CDP detection bypass",
+        "TLS fingerprint = Chrome",
+        "Canvas/WebGL/Audio noise",
+        "WebRTC IP spoofing"
+      ],
+      "detection_test_results": {
+        "bot.sannysoft.com": "56/56 ALL GREEN",
+        "bot.incolumitas.com": "35/36 passed",
+        "browserscan.net": "Normal 19/19",
+        "deviceandbrowserinfo.com": "isBot: false",
+        "recaptcha_v3_score": "0.9 (human level)"
+      }
+    },
+    "microsoft_graph_api": {
+      "type": "api",
+      "description": "Microsoft Graph API for email access (OAuth2 required)",
+      "library": "O365/python-o365",
+      "github": "https://github.com/O365/python-o365",
+      "note": "Basic auth disabled since 2024. Requires OAuth2 or App Password."
+    },
+    "gmail_imap": {
+      "type": "email-access",
+      "description": "Gmail IMAP for reading verification codes",
+      "server": "imap.gmail.com:993",
+      "auth": "App Password (not regular password)",
+      "setup_url": "https://myaccount.google.com/apppasswords"
+    }
+  },
+
+  "outlook_login_flow": {
+    "description": "Automated Outlook login with recovery email verification",
+    "steps": [
+      {
+        "step": 1,
+        "action": "Open login.live.com",
+        "selector": "#usernameEntry or input[type=email]",
+        "wait": "10s (proxy delay)"
+      },
+      {
+        "step": 2,
+        "action": "Enter Outlook email and submit",
+        "selector": "button[type=submit]",
+        "wait": "8s"
+      },
+      {
+        "step": 3,
+        "action": "Check page state",
+        "cases": {
+          "password_field": "Enter password directly",
+          "recovery_required": "Match masked email from .env list",
+          "use_password_option": "Click via dispatchEvent"
+        }
+      },
+      {
+        "step": 4,
+        "action": "Recovery email verification",
+        "substeps": [
+          "Enter matched recovery email in #proof-confirmation-email-input",
+          "Click 'Send code' button",
+          "Wait for code via IMAP (max 120s)",
+          "If no code → click 'Use your password' (dispatchEvent)",
+          "Enter password"
+        ]
+      },
+      {
+        "step": 5,
+        "action": "Navigate to Outlook inbox (bypass passkey)",
+        "url": "https://outlook.live.com/mail/0/inbox",
+        "note": "Direct navigation bypasses passkey setup page"
+      }
+    ],
+    "key_discoveries": {
+      "use_password_click": "Regular click() fails on span.fui-Link. Must use dispatchEvent with MouseEvent (mousedown/mouseup/click) on the leaf node element.",
+      "passkey_bypass": "Passkey setup page has no skip button. Navigate directly to Outlook URL — cookies are already set from password acceptance.",
+      "send_code_required": "Must click 'Send code' button before code is sent. Code is NOT sent automatically when entering recovery email.",
+      "recovery_matching": "Masked email like 'na*****@gmail.com' can match multiple candidates. Try each one.",
+      "code_timeout": "If code not received after 2 min, fall back to 'Use your password' — likely rate limited."
+    }
+  },
+
+  "known_issues": {
+    "imap_code_timeout": "Microsoft sometimes doesn't send codes to recovery emails. Rate limiting suspected. Fallback: 'Use your password' works reliably.",
+    "passkey_setup": "No skip button visible. Workaround: navigate directly to Outlook URL.",
+    "login_slow": "~3 min per account due to 2-min IMAP polling timeout. Optimization: reduce timeout or skip IMAP entirely and always use password fallback."
+  },
+
+  "optimization_ideas": [
+    "Skip IMAP polling entirely — always use 'Use your password' fallback (saves 2 min per account)",
+    "Parallel account processing with multiple browser instances",
+    "Session persistence via launch_persistent_context() to skip verification on repeat logins",
+    "Proxy rotation for batch processing to avoid rate limits"
+  ]
+}
